@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Image Logo Adder</title>
+<style>
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #f5f6fa;
+    text-align: center;
+    padding: 40px;
+  }
+  h2 {
+    margin-bottom: 10px;
+  }
+  form {
+    background: white;
+    display: inline-block;
+    padding: 20px 40px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  input, select, button {
+    margin: 10px 0;
+    padding: 8px;
+    font-size: 15px;
+  }
+  button {
+    background: #0078ff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  #output {
+    margin-top: 30px;
+  }
+  .preview {
+    margin: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    width: 150px;
+    height: auto;
+  }
+</style>
+</head>
+<body>
+
+<h2>🖼️ Add Logo to Images</h2>
+<p>Upload JPG/PNG images and choose your logo type.</p>
+
+<form id="uploadForm">
+  <input type="file" id="images" multiple accept=".jpg,.jpeg,.png" required><br>
+  <label>Logo Type:</label>
+  <select id="logoType" required>
+    <option value="white">⚪ White Logo</option>
+    <option value="black">⚫ Black Logo</option>
+  </select><br>
+  <button type="submit">Process Images</button>
+</form>
+
+<div id="output"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script>
+/* --- Developer Configurable Section --- */
+const logoPaths = {
+  white: "white_logo.png", // path to your white logo
+  black: "black_logo.png"  // path to your black logo
+};
+const margin = 20;
+const scales = {
+  white: { horizontal: 0.24, vertical: 0.30 },
+  black: { horizontal: 0.30, vertical: 0.36 }
+};
+
+/* --- Core Logic --- */
+document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const files = [...document.getElementById("images").files];
+  const logoType = document.getElementById("logoType").value;
+  const outputDiv = document.getElementById("output");
+
+  if (!files.length) return alert("Please upload at least one image!");
+
+  outputDiv.innerHTML = "Processing... ⏳";
+
+  const zip = new JSZip();
+  const logoImg = await loadImage(logoPaths[logoType]);
+
+  let processedCount = 0;
+  for (const file of files) {
+    const img = await loadImage(URL.createObjectURL(file));
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const w = img.width;
+    const h = img.height;
+    canvas.width = w;
+    canvas.height = h;
+
+    ctx.drawImage(img, 0, 0, w, h);
+
+    const shorterSide = Math.min(w, h);
+    const isVertical = h > w;
+    const scale = isVertical ? scales[logoType].vertical : scales[logoType].horizontal;
+    const logoWidth = shorterSide * scale;
+    const aspectRatio = logoImg.width / logoImg.height;
+    const logoHeight = logoWidth / aspectRatio;
+
+    const left = w - logoWidth - margin;
+    const top = margin;
+
+    ctx.drawImage(logoImg, left, top, logoWidth, logoHeight);
+
+    const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.95));
+    zip.file(`watermarked_${file.name}`, blob);
+    processedCount++;
+  }
+
+  const zipBlob = await zip.generateAsync({ type: "blob" });
+  saveAs(zipBlob, "output_images.zip");
+
+  outputDiv.innerHTML = `✅ ${processedCount} image(s) processed.<br>Download should start automatically.`;
+});
+
+/* --- Helper: Load image as Promise --- */
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+</script>
+
+</body>
+</html>
